@@ -163,6 +163,12 @@ The architecture includes the following key components:
     * **Recommendation:** Use `Auto` or `Initial` mode for production.
     * **Benefits:** Prevents resource starvation, optimizes resource utilization.
     * **Considerations:** Can lead to pod restarts if resource limits are changed in `Auto` mode.
+  
+* **Kubernetes Event-driven Autoscaler (KEDA):**
+    * **Description:** Scales the number of pods based on events from various sources (e.g., message queues like Kafka, metrics from Prometheus, etc.).
+    * **Benefits:** Enables scaling based on events, not just resource utilization.  This is particularly useful for event-driven workloads.
+    * **Scalers:** KEDA uses "Scalers" to connect to different event sources.  You configure the appropriate scaler for your event source (e.g., Kafka scaler, Prometheus scaler).
+    * **Triggers:** Define "Triggers" in your deployments to specify the scaling behavior based on the events.  You can define thresholds, polling intervals, and other parameters.
 
 **General Autoscaling Strategy:**
 
@@ -199,6 +205,14 @@ The architecture includes the following key components:
 * The HPA detects high CPU utilization.
 * The HPA increases the number of pods for that service.
 * The new pods handle the increased load.
+
+**Example Scenario (Scaling based on Kafka messages (KEDA)):**
+
+1. Configure a Kafka scaler in KEDA to connect to your MSK topic.
+2. Define a trigger in your deployment that specifies the desired number of pods based on the number of messages in the Kafka topic.
+3. KEDA monitors the number of messages in the topic.
+4. If the number of messages exceeds the threshold, KEDA scales up the number of pods.
+5. When the number of messages decreases, KEDA scales down the pods.
 
 **Example Scenario (EKS Node Scaling with Karpenter):**
 
