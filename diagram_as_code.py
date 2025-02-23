@@ -1,6 +1,7 @@
 #######################################
 # THIS CODE IS ONLY FOR EXPERIMENT
 #######################################
+
 from diagrams import Diagram, Cluster, Edge
 from diagrams.aws.compute import Lambda
 from diagrams.aws.compute import EKS
@@ -14,121 +15,110 @@ from diagrams.aws.devtools import XRay
 from diagrams.aws.analytics import ManagedStreamingForKafka as MSK
 from diagrams.aws.general import Client
 
-with Diagram("Trading System Architecture", show=False, graph_attr={"nodesep":"1.2", "ranksep":"1.2"}) as diag: # Increased node and rank separation
-    # Single, General Client
-    client = Client("Clients (Web/Mobile)")  # Combined client
+# Define some styling constants
+DIAGRAM_ATTRS = {
+    "pad": "2.0",
+    "splines": "ortho",  
+    "nodesep": "1.5",    
+    "ranksep": "1.8",    
+    "fontsize": "45",    
+    "fontname": "Arial"
+}
 
-    with Cluster("Network", graph_attr={"margin":"2.0"}): # Increased margin for network components
+CLUSTER_ATTRS = {
+    "margin": "30",
+    "fontsize": "13",
+    "fontname": "Arial",
+    "style": "rounded",  # Rounded corners for clusters
+    "penwidth": "2.0"    
+}
+
+EDGE_ATTRS = {
+    "fontsize": "11",
+    "fontname": "Arial",
+    "penwidth": "2.0"    
+}
+
+with Diagram(
+    "Trading System Architecture",
+    show=False,
+    direction="LR",      # Left to right layout
+    graph_attr=DIAGRAM_ATTRS,
+    edge_attr=EDGE_ATTRS
+) as diag:
+    
+    # Client Layer
+    with Cluster("Client Layer", graph_attr=CLUSTER_ATTRS):
+        client = Client("Trading Clients\n(Web/Mobile)")
+
+    # API Layer
+    with Cluster("API Layer", graph_attr=CLUSTER_ATTRS):
         apigateway = APIGateway("API Gateway")
 
-    with Cluster("Order Ingestion", graph_attr={"margin":"2.0"}): # Increased margin for order ingestion
-        order_ingestion = Lambda("Lambda (Order Ingestion)")
+    # Order Processing Layer
+    with Cluster("Order Processing", graph_attr=CLUSTER_ATTRS):
+        order_ingestion = Lambda("Order Ingestion")
+        
+        with Cluster("Message Queue"):
+            order_queues = [
+                MSK("order-requests"),
+                MSK("validated-orders"),
+                MSK("matched-events"),
+                MSK("trade-execution")
+            ]
 
-    with Cluster("Message Queue (MSK)", graph_attr={"margin":"2.0"}): # Increased margin for MSK
-        order_stream = MSK("MSK (order-requests)")
-        validated_orders = MSK("validated-orders")
-        matching_events = MSK("matched-events")
-        trade_execution = MSK("trade-execution")
+    # Core Trading Layer
+    with Cluster("Trading Engine (EKS)", graph_attr=CLUSTER_ATTRS):
+        with Cluster("Trading Services"):
+            trading_services = [
+                EKS("Order Processor"),
+                EKS("Matching Engine"),
+                EKS("Market Data")
+            ]
 
-    with Cluster("EKS Cluster", graph_attr={"margin":"2.0"}): # Increased margin for EKS cluster
-        with Cluster("Order Processing"):
-            order_processor = EKS("Order Processor (Pod)")
-        with Cluster("Matching Engine"):
-            matcher = EKS("Matcher (Pod)")
-        with Cluster("Market Data Service"):
-            market_data = EKS("MarketData (Pod)")
+    # Data Layer
+    with Cluster("Data Storage & Processing", graph_attr=CLUSTER_ATTRS):
+        databases = [
+            Aurora("Orders DB"),
+            Aurora("Users DB"),
+            ElastiCache("Order Cache")
+        ]
+        
+        data_pipeline = [
+            Kinesis("Data Stream"),
+            S3("Data Lake"),
+            Athena("Analytics")
+        ]
 
-    with Cluster("Data Storage", graph_attr={"margin":"2.0"}): # Increased margin for data storage
-        orders_db = Aurora("Aurora (Orders)")
-        users_db = Aurora("Aurora (Users) Account")
-        elasticache = ElastiCache("ElastiCache")
-        kinesis = Kinesis("Kinesis Data Stream")
-        s3 = S3("S3 Bucket")
-        glue = Athena("Glue")
+    # Monitoring Layer
+    with Cluster("Observability", graph_attr=CLUSTER_ATTRS):
+        monitoring = [
+            Cloudwatch("Metrics & Logs"),
+            XRay("Tracing")
+        ]
 
-    with Cluster("Monitoring & Tracing", graph_attr={"margin":"2.0"}): # Increased margin for monitoring
-        cloudwatch = Cloudwatch("Cloudwatch")
-        xray = XRay("X-Ray")
-
-    # Connections (Simplified with annotations and explicit directions)
-    client >> apigateway << Edge(label="1. HTTPS/Websocket", style="->")  # Explicit direction
-    apigateway >> order_ingestion << Edge(label="2. X-Ray request tracing initialization", style="->")
-    order_ingestion >> order_stream << Edge(label="3. Order Ingestion", style="->")
-
-    order_stream >> order_processor << Edge(label="4. Order Received", style="->")
-
-    order_processor >> orders_db << Edge(label="5a. 1st DUAL WRITE", style="->")
-    order_processor >> users_db << Edge(label="5b. Verify user's balance", style="->")
-    order_processor >> elasticache << Edge(label="5c. 2nd DUAL WRITE", style="->")
-    order_processor >> validated_orders << Edge(label="6. Publish validated order", style="->")
-
-    validated_orders >> matcher << Edge(label="7. Order Matching", style="->")
-
-    matcher >> matching_events << Edge(label="8a. Matching Events", style="->")
-    matcher >> trade_execution << Edge(label="8b. Trade Execution", style="->")
-
-    matching_events >> market_data << Edge(label="9a. Market Data Updates (Matched Events)", style="->")
-    trade_execution >> market_data << Edge(label="9b. Market Data Updates (Trade Execution)", style="->")
-    market_data >> apigateway << Edge(label="9c. WebSocket connection", style="->")
-
-    trade_execution >> kinesis << Edge(label="10a. Trade Execution Stream", style="->")
-    kinesis >> s3 << Edge(label="10b. Data Storage", style="->")
-    s3 >> glue << Edge(label="10c. Data Processing", style="->")
-
-    apigateway >> cloudwatch << Edge(label="11a. Logs & Metrics", style="->")
-    order_ingestion >> cloudwatch << Edge(style="->")  # Added direction
-    order_processor >> cloudwatch << Edge(style="->")  # Added direction
-    matcher >> cloudwatch << Edge(style="->")  # Added direction
-    market_data >> cloudwatch << Edge(style="->")  # Added direction
-    kinesis >> cloudwatch << Edge(style="->")  # Added direction
-    s3 >> cloudwatch << Edge(style="->")  # Added direction
-
-    apigateway >> xray << Edge(label="11b. X-Ray requests tracing", style="->")
-    order_ingestion >> xray << Edge(style="->")  # Added direction
-    order_processor >> xray << Edge(style="->")  # Added direction
-    matcher >> xray << Edge(style="->")  # Added direction
-    market_data >> xray << Edge(style="->")  # Added direction
-    kinesis >> xray << Edge(style="->")  # Added direction
-
-    # Workflow Steps (using Subgraphs/Clusters with Labels - Simplified and Numbered)
-    with Cluster("Workflow Steps", direction="LR", graph_attr={"nodesep":"1.0", "ranksep":"1.0"}): # Increased node and rank separation for workflow steps
-        with Cluster("1. User Submits Order"):
-            client >> apigateway
-
-        with Cluster("2. Order Ingestion & Validation"):
-            apigateway >> order_ingestion
-            order_ingestion >> order_stream
-
-        with Cluster("3. Order Processing"):
-            order_stream >> order_processor
-
-        with Cluster("4. Matching & Trade Execution"):
-            validated_orders >> matcher
-            matcher >> matching_events
-            matcher >> trade_execution
-
-        with Cluster("5. Market Data Updates"):
-            matching_events >> market_data
-            trade_execution >> market_data
-            market_data >> apigateway
-
-        with Cluster("6. Data Streaming & Storage"):
-            trade_execution >> kinesis
-            kinesis >> s3
-            s3 >> glue
-
-        with Cluster("7. Monitoring & Tracing"):
-            apigateway >> cloudwatch
-            order_ingestion >> cloudwatch
-            order_processor >> cloudwatch
-            matcher >> cloudwatch
-            market_data >> cloudwatch
-            kinesis >> cloudwatch
-            s3 >> cloudwatch
-
-            apigateway >> xray
-            order_ingestion >> xray
-            order_processor >> xray
-            matcher >> xray
-            market_data >> xray
-            kinesis >> xray
+    # Draw main flow connections
+    client >> Edge(label="1. Submit Order", color="blue") >> apigateway
+    apigateway >> Edge(label="2. Process", color="blue") >> order_ingestion
+    order_ingestion >> Edge(label="3. Queue", color="blue") >> order_queues[0]
+    
+    # Order processing flow
+    order_queues[0] >> Edge(label="4. Validate", color="green") >> trading_services[0]
+    trading_services[0] >> Edge(label="5. Store", color="green") >> databases[0]
+    trading_services[0] >> Edge(label="6. Cache", color="green") >> databases[2]
+    
+    # Trading flow
+    trading_services[0] >> Edge(label="7. Match", color="orange") >> trading_services[1]
+    trading_services[1] >> Edge(label="8. Execute", color="orange") >> order_queues[2]
+    
+    # Market data flow
+    order_queues[2] >> Edge(label="9. Update", color="purple") >> trading_services[2]
+    trading_services[2] >> Edge(label="10. Stream", color="purple") >> apigateway
+    
+    # Data pipeline
+    order_queues[3] >> Edge(label="11. Archive", color="red") >> data_pipeline[0]
+    data_pipeline[0] >> data_pipeline[1] >> data_pipeline[2]
+    
+    # Monitoring connections (simplified)
+    [apigateway, order_ingestion, trading_services[0]] >> monitoring[0]
+    [apigateway, order_ingestion, trading_services[0]] >> monitoring[1]
