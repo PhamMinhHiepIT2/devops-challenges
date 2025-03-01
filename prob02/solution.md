@@ -145,6 +145,7 @@ The architecture includes the following key components:
 * **Scaling Metrics:**
     * Number of pending pods.
     * Overall cluster resource utilization.
+ 
 **EKS Pod Scaling:**
 
 * **Combined Strategy:** Horizontal Pod Autoscaler (HPA) *and* Vertical Pod Autoscaler (VPA)
