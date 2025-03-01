@@ -227,5 +227,3 @@ The architecture includes the following key components:
 * **Monitoring & Alerting:** Implement monitoring and alerting for scaling metrics.
 * **Load Testing:** Conduct load testing to fine-tune autoscaling configurations.
 * **Capacity Planning:** Proactively plan for growth.
-
-This document provides a general autoscaling strategy. Adapt it to your specific application requirements. Continuous monitoring and adjustment are essential.
